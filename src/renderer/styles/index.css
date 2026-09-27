@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/*
+ * The BrowserWindow is transparent, so the page itself must be too. Without an
+ * explicit transparent background the canvas paints opaque white and the
+ * "overlay" shows up as a white rectangle.
+ */
+html,
+body,
+#root {
+  height: 100%;
+  background: transparent;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+
+  /* An overlay is not a document: no text selection, no rubber-band scroll. */
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+/* Framer Motion writes width/height directly; this avoids layout thrash. */
+#root {
+  contain: layout style;
+}
