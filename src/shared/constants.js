@@ -28,11 +28,17 @@ export const IPC = {
   ANIMATION_COMPLETE: 'island:animation-complete',
   /** renderer -> main: pointer entered/left the island, toggle click-through */
   SET_MOUSE_INTERACTIVE: 'island:set-mouse-interactive',
+  /** renderer -> main: a voice session phase (and optional failure detail) */
+  SESSION_STATUS: 'island:session-status',
+  /** renderer -> main: a diagnostic log line, mirrored to the main console */
+  LOG: 'island:log',
 
   /** main -> renderer: authoritative state changed */
   STATE_CHANGE: 'island:state-change',
   /** main -> renderer: window visibility changed */
   VISIBILITY_CHANGE: 'island:visibility-change',
+  /** main -> renderer: start or stop the JARVIS voice session */
+  SESSION_COMMAND: 'island:session-command',
 }
 
 /**
@@ -59,15 +65,20 @@ export const DEV_SERVER_URL = 'http://localhost:5173'
 export const DEV_SERVER_TIMEOUT_MS = 30_000
 
 /**
- * Development trigger.
+ * Primary trigger: start or stop a JARVIS voice session.
  *
  * The intended binding is a bare `Ctrl+Alt`, but Electron's `globalShortcut`
  * cannot express it: Chromium's accelerator parser rejects any combination with
  * no non-modifier key (electron/shell/browser/ui/accelerator_util.cc returns
  * false when the key is VKEY_UNKNOWN). A modifier-only trigger on Windows needs
- * a low-level keyboard hook (`SetWindowsHookEx` / `WH_KEYBOARD_LL`), which would
- * mean a native dependency. That is deliberately not pulled in yet — see
+ * a low-level keyboard hook (`SetWindowsHookEx` / `WH_KEYBOARD_LL`, usually via a
+ * native module). That is deliberately not pulled in yet — see
  * ShortcutManager for the seam where it would live.
+ *
+ * The binding carries the session lifecycle, not island visibility: the first
+ * press starts a session (token, connect, microphone), the second stops it and
+ * dismisses the island. Pressing it while a session is still connecting stops
+ * that attempt, so a session can never be doubled by pressing twice.
  */
 export const ACCELERATOR = 'Ctrl+Alt+Space'
 

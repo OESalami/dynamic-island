@@ -1,12 +1,15 @@
 import { DynamicIsland } from './components/dynamic-island/DynamicIsland.jsx'
 import { useIslandState } from './hooks/useIslandState.js'
+import { useJarvisSession } from './hooks/useJarvisSession.js'
 
 /**
- * Deliberately thin. All island behaviour lives in DynamicIsland; this exists to
- * own the state subscription and the full-window transparent backdrop.
+ * Deliberately thin. Island rendering lives in DynamicIsland; the voice session
+ * lives in the livekit service and is only wired to the bridge here. This is the
+ * app-level wiring: state subscription, session commands, transparent backdrop.
  */
 export default function App() {
   const { state } = useIslandState()
+  useJarvisSession()
 
   return (
     // pointer-events-none so the transparent canvas never intercepts clicks;

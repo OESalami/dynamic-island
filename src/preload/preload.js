@@ -80,6 +80,27 @@ const islandApi = {
    */
   setMouseInteractive: (interactive) =>
     ipcRenderer.send(CH.SET_MOUSE_INTERACTIVE, interactive === true),
+
+  /**
+   * Subscribe to voice session commands (start / stop). Returns an unsubscribe
+   * function. The renderer decides nothing about the session: it is told when to
+   * start and stop, and reports back what happened.
+   */
+  onSessionCommand: (callback) => subscribe(CH.SESSION_COMMAND, callback),
+
+  /**
+   * Report a voice session phase to the main process, which owns island state and
+   * maps the phase onto it. `detail` carries a failure code and message only —
+   * never a token, a secret, or a raw error object.
+   */
+  sendSessionStatus: (phase, detail) =>
+    ipcRenderer.send(CH.SESSION_STATUS, { phase, ...(detail ?? {}) }),
+
+  /**
+   * Mirror one diagnostic line to the main console. The island window is never
+   * focused, so the renderer console cannot be opened by hand during normal use.
+   */
+  writeLog: (level, message) => ipcRenderer.send(CH.LOG, level, String(message)),
 }
 
 contextBridge.exposeInMainWorld('jarvisIsland', islandApi)
