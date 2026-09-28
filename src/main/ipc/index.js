@@ -8,6 +8,7 @@ import {
   show,
   toggle,
 } from '../island/islandController.js'
+import { handleSessionStatus } from '../session/sessionController.js'
 import { getIslandWindow, setMouseInteractive } from '../windows/islandWindow.js'
 
 /**
@@ -17,6 +18,12 @@ import { getIslandWindow, setMouseInteractive } from '../windows/islandWindow.js
  * here, so nothing reaches ipcRenderer that was not deliberately exposed. There
  * are no generic `execute` / `command` / `eval` channels by design.
  */
+
+/** Levels the renderer may log through IPC.LOG. Anything else is treated as `log`. */
+const LOG_LEVELS = new Set(['log', 'warn', 'error'])
+
+/** Log lines are diagnostics, not a transport: bound what the renderer can push. */
+const MAX_LOG_LENGTH = 500
 
 /**
  * Only accept messages from our own island window.
@@ -60,5 +67,21 @@ export function registerIpcHandlers() {
 
   ipcMain.on(IPC.SET_MOUSE_INTERACTIVE, (event, interactive) => {
     if (isTrustedSender(event)) setMouseInteractive(interactive)
+  })
+
+  // Voice session progress. The renderer owns the LiveKit connection, so it
+  // reports phases; the state machine stays here.
+  ipcMain.on(IPC.SESSION_STATUS, (event, payload) => {
+    if (isTrustedSender(event)) handleSessionStatus(payload)
+  })
+
+  // Renderer diagnostics, so the [JARVIS] session logs land in the terminal that
+  // started the app. The island window is never focused, so the renderer console
+  // is not reachable interactively — this is the only place they are visible.
+  ipcMain.on(IPC.LOG, (event, level, message) => {
+    if (!isTrustedSender(event)) return
+    if (typeof message !== 'string') return
+    const prefix = LOG_LEVELS.has(level) ? level : 'log'
+    console[prefix](message.slice(0, MAX_LOG_LENGTH))
   })
 }
