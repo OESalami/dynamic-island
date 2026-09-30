@@ -89,6 +89,8 @@ class JarvisSession {
   /** Serialises work so two teardowns, or a teardown and a start, never interleave. */
   #queue = Promise.resolve()
   #listeners = new Set()
+  /** Subscribers told when the agent's or the local audio track appears or goes. */
+  #audioListeners = new Set()
 
   /** Subscribe to session phases. Returns an unsubscribe function. */
   onPhase(listener) {
@@ -100,6 +102,21 @@ class JarvisSession {
   /** The phase of the session, e.g. `listening`. Never a LiveKit type. */
   getPhase() {
     return this.#phase
+  }
+
+  /**
+   * Subscribe to changes in which audio sources exist. Returns an unsubscribe
+   * function.
+   *
+   * Separate from `onPhase` because the two do not move together: the agent's
+   * track arrives and ends with the turns, and either can change without the
+   * island's phase changing at all. A listener here is told to re-read the
+   * streams rather than handed them, so it always reads the current truth.
+   */
+  onAudioSourcesChange(listener) {
+    if (typeof listener !== 'function') return () => {}
+    this.#audioListeners.add(listener)
+    return () => this.#audioListeners.delete(listener)
   }
 
   /** The session id assigned by the main process, echoed back in every report. */
@@ -119,6 +136,28 @@ class JarvisSession {
   /** The SDK connection state (`connected`, `reconnecting`, `disconnected`, ...). */
   getConnectionState() {
     return this.#attempt?.client?.getConnectionState() ?? 'disconnected'
+  }
+
+  /**
+   * The agent's audio as a `MediaStream`, for the island's visualizer.
+   *
+   * Null between turns, which is a normal state rather than a failure: the agent
+   * publishes audio per turn, so there is simply no track to look at while the
+   * user is speaking. Always read it through this method so the renderer keeps
+   * its existing boundary and never reaches into the LiveKit client itself.
+   */
+  getAgentAudioStream() {
+    return this.#attempt?.client?.getAgentAudioStream() ?? null
+  }
+
+  /**
+   * The local microphone as a `MediaStream`, for the island's visualizer.
+   *
+   * Null whenever the microphone is not published — before a session starts, and
+   * while the user is muted.
+   */
+  getMicrophoneStream() {
+    return this.#attempt?.client?.getMicrophoneStream() ?? null
   }
 
   /**
@@ -211,6 +250,7 @@ class JarvisSession {
     const client = attempt.client
     attempt.client = null
     this.#listeners.clear()
+    this.#audioListeners.clear()
     if (client) void client.disconnect()
   }
 
@@ -228,6 +268,19 @@ class JarvisSession {
         listener(phase, detail)
       } catch {
         // A listener that throws must not interrupt the session teardown.
+      }
+    }
+  }
+
+  /** Tell the visualizer that the set of readable audio sources has changed. */
+  #emitAudioSourcesChange() {
+    for (const listener of this.#audioListeners) {
+      try {
+        listener()
+      } catch {
+        // Same rule as phases: a broken listener cannot be allowed to unwind the
+        // session. This runs from inside a Room event handler, where an escaped
+        // throw is reported by the SDK as a read-loop error and ends the session.
       }
     }
   }
@@ -268,7 +321,18 @@ class JarvisSession {
     }
     if (event === SESSION_EVENTS.AGENT_AUDIO_SUBSCRIBED) {
       jarvisLog('Agent audio subscribed')
+      this.#emitAudioSourcesChange()
       return
+    }
+    if (event === SESSION_EVENTS.AGENT_AUDIO_UNSUBSCRIBED) {
+      // A turn ended. The phase has not moved yet, but the agent now has no track
+      // to analyse, so the visualizer has to be told before it reads silence.
+      this.#emitAudioSourcesChange()
+      return
+    }
+    if (event === SESSION_EVENTS.MICROPHONE) {
+      // Published or muted: either way the local stream appears or disappears.
+      this.#emitAudioSourcesChange()
     }
     if (event === SESSION_EVENTS.AGENT_AUDIO_PLAYBACK) {
       if (payload?.playing) jarvisLog('Agent speaking')
@@ -394,6 +458,11 @@ class JarvisSession {
     } else {
       jarvisLog('Session cleanup: nothing to disconnect.')
     }
+
+    // Both audio sources are gone now, so the visualizer must stop before it reads
+    // a room that no longer exists. Emitted last, and unconditionally, because a
+    // failure path tears down without ever having published either one.
+    this.#emitAudioSourcesChange()
 
     if (reportStopped) {
       this.#emitPhase(SESSION_PHASES.STOPPED)

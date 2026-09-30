@@ -1,6 +1,22 @@
 @import "tailwindcss";
 
 /*
+ * The shadcn colour tokens the ElevenLabs UI components are written against.
+ *
+ * The visualizer styles its bars with `bg-border`, `bg-primary` and `bg-muted`,
+ * which resolve to nothing unless the theme defines them. Only the three names it
+ * actually uses are declared, as `@theme` variables rather than a shadcn block:
+ * the island is a dark surface, so `primary` is white and `border` is a dim
+ * white. `muted` is transparent because the island must not paint a panel behind
+ * the bars — the window itself is already transparent.
+ */
+@theme {
+  --color-primary: oklch(1 0 0);
+  --color-muted: transparent;
+  --color-border: oklch(1 0 0 / 0.22);
+}
+
+/*
  * The BrowserWindow is transparent, so the page itself must be too. Without an
  * explicit transparent background the canvas paints opaque white and the
  * "overlay" shows up as a white rectangle.
