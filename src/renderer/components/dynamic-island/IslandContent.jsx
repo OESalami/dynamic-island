@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
-import { STATE_LABELS } from '../../../shared/islandStates.js'
+import { BarVisualizer } from '../ui/bar-visualizer.jsx'
+import { agentVisualizerState } from './agentVisualStates.js'
 import { contentFade } from './islandVariants.js'
 
 /**
@@ -7,8 +8,20 @@ import { contentFade } from './islandVariants.js'
  *
  * Purely presentational: it receives a state and returns markup, with no
  * knowledge of Electron, IPC, or how the state was decided.
+ *
+ * The expanded island shows live audio rather than a status word. Each state maps
+ * to a visualizer state, and the bar animation and colour carry the meaning that
+ * "Thinking" / "Responding" used to spell out:
+ *
+ *   listening   one bar blinks in the centre
+ *   processing  the same, faster, so the two read as different at a glance
+ *   responding  every bar is lit and driven by the agent's real audio
+ *   idle        a sweep walks in from both ends
+ *
+ * `mediaStream` is threaded in rather than read here, to keep this component free
+ * of the session.
  */
-export function IslandContent({ state, isCollapsed }) {
+export function IslandContent({ state, isCollapsed, mediaStream }) {
   if (isCollapsed) {
     return (
       <motion.span
@@ -35,15 +48,15 @@ export function IslandContent({ state, isCollapsed }) {
         JARVIS
       </motion.span>
       <span className="h-3 w-px bg-white/15" />
-      <motion.span
-        variants={contentFade}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        className="text-[13px] text-white/60"
-      >
-        {STATE_LABELS[state] ?? ''}
-      </motion.span>
+      <BarVisualizer
+        state={agentVisualizerState(state)}
+        mediaStream={mediaStream}
+        barCount={15}
+        minHeight={15}
+        maxHeight={100}
+        centerAlign
+        className="h-5 w-28 gap-[3px] bg-transparent p-0"
+      />
     </div>
   )
 }

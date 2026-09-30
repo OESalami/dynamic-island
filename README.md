@@ -71,11 +71,16 @@ src/
     components/dynamic-island/
       DynamicIsland.jsx     Presence + shape motion, hover/click-through
       IslandContent.jsx     Purely presentational per-state markup
+      agentVisualStates.js  Island state -> visualizer state
       islandVariants.js     The motion language (easings, durations, geometry)
+    components/ui/
+      bar-visualizer.jsx    ElevenLabs UI registry: live audio frequency bars
     hooks/useIslandState.js Mirrors main-owned state
     hooks/useJarvisSession.js  Wires session commands, phases and logs over IPC
+    hooks/useIslandAudioStream.js  Picks the agent or mic track for the visualizer
     hooks/useMousePassthrough.js  Flips click-through on hover
     lib/bridge.js           The single access point to `window.jarvisIsland`
+    lib/utils.js            The shadcn `cn` helper the UI components expect
     livekit/                The only code that knows LiveKit exists
       livekitSession.js     Session orchestrator: queue, cancellation, teardown
       livekitClient.js      The only `livekit-client` import; owns the Room
@@ -353,7 +358,11 @@ These are deliberate seams, each documented at its implementation site:
 - **Modifier-only trigger is not possible.** The intended binding is a bare `Ctrl+Alt`, but Chromium's accelerator parser rejects any combination with no non-modifier key. A modifier-only trigger on Windows needs a low-level keyboard hook (`SetWindowsHookEx` / `WH_KEYBOARD_LL`), i.e. a native dependency. `ShortcutManager` is the seam: write a class with the same three methods and swap it in `main.js` — nothing else changes.
 - **No click-away dismissal.** The window is `focusable: false`, so the OS never fires `blur` for it. Auto-dismiss is therefore time-based. To get real click-away dismissal, flip `focusable` to `true` in `islandWindow.js` (keep `showInactive()`, which still avoids stealing focus) and hide on `blur`.
 - **Primary display only.** `screen.js` already exposes `getWorkAreaAtPoint` / `getIslandBoundsAtPoint` so the island can follow the cursor or the active window once multi-monitor support lands, without changing the positioning contract.
-- **Placeholder content.** `IslandContent` renders the state label only. There is no waveform, transcript, or tool output yet. Session phases map onto the existing states precisely so the UI could grow here without touching the state model.
+- **Transcript and tool output are still placeholder.** `IslandContent` renders live audio levels instead of a
+state label — the ElevenLabs Bar Visualizer, driven by the agent's own track while it speaks and by the microphone
+while the user does. There is no transcript or tool output yet. Session phases map onto the existing states
+precisely so the UI could grow here without touching the state model.
+
 - **Agent state is inferred, not reported.** The LiveKit client has no agent-state API, so `thinking` and `responding` come from active-speaker detection. A server without active-speaker support leaves the island on `listening`.
 - **A room is created per session.** Pressing the shortcut twice joins two different rooms, so an agent that is already in the first room is not in the second. Explicit dispatch makes that correct; automatic dispatch with a sticky agent would need a stable room name.
 - **No automated tests.** Verification was manual: the dev state-cycle shortcut, a temporary harness that drives the real main process against the built renderer and a fake token endpoint, and the lint/build commands above. The harness was removed after use, so the session path has no regression net yet.

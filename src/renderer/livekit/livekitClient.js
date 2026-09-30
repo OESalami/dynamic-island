@@ -104,6 +104,20 @@ export function createLiveKitClient({ onEvent }) {
   const audioElements = new Set()
   /** The remote participant treated as the agent. */
   let agentParticipant = null
+  /**
+   * The agent's currently subscribed audio track, and the `MediaStream` wrapping
+   * it for the island's visualizer.
+   *
+   * The stream is cached and keyed on the track so that reading it is cheap and,
+   * more importantly, so that it keeps the same object identity for as long as the
+   * track does. The visualizer rebuilds its Web Audio analyser whenever the
+   * `MediaStream` it is handed changes, so returning a fresh wrapper on every
+   * render would tear down and recreate an analyser every frame.
+   */
+  let agentAudioTrack = null
+  let agentAudioStream = null
+  /** Cached `MediaStream` over the published microphone track, for the visualizer. */
+  let microphoneStream = null
   /** Last speaking state pushed to the session, so only changes are emitted. */
   let lastAgentSpeaking = false
   let lastUserSpeaking = false
@@ -357,6 +371,10 @@ export function createLiveKitClient({ onEvent }) {
     on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
       if (track.kind !== Track.Kind.Audio) return
       if (!agentParticipant) adoptParticipant(participant)
+      // Held for the visualizer. The same track is what `attachAgentAudio` plays,
+      // so nothing extra is subscribed or captured here.
+      agentAudioTrack = track
+      agentAudioStream = null
       jarvisLog(`Agent audio subscribed (track ${track.sid} from ${participant.identity})`)
       emit(SESSION_EVENTS.AGENT_AUDIO_SUBSCRIBED, { identity: participant.identity })
       // `attachAgentAudio` is async, so it cannot throw into the SDK's read loop,
@@ -369,8 +387,15 @@ export function createLiveKitClient({ onEvent }) {
     on(RoomEvent.TrackUnsubscribed, (track) => {
       if (track.kind !== Track.Kind.Audio) return
       releaseAgentAudio(track)
-      // An agent turn ending is a normal part of a conversation, not the end of
-      // the session. Nothing here touches the room.
+      // An agent turn ending is a normal part of a conversation, not the end of the
+      // session. Nothing here touches the room.
+      //
+      // The track reference is dropped so the visualizer reports no audio until the
+      // next turn arrives, rather than reading a dead track as silence.
+      if (agentAudioTrack === track) {
+        agentAudioTrack = null
+        agentAudioStream = null
+      }
       jarvisLog(`Agent audio ended (track ${track.sid}); the session stays connected`)
       emit(SESSION_EVENTS.AGENT_AUDIO_UNSUBSCRIBED, {})
     })
@@ -475,10 +500,13 @@ export function createLiveKitClient({ onEvent }) {
         disposeElement(element)
       }
       audioElements.clear()
+      microphoneStream = null
 
       const target = room
       room = null
       agentParticipant = null
+      agentAudioTrack = null
+      agentAudioStream = null
       announcedConnected = false
       recovering = false
 
@@ -494,6 +522,47 @@ export function createLiveKitClient({ onEvent }) {
 
     isConnected() {
       return room?.state === ConnectionState.Connected
+    },
+
+    /**
+     * A `MediaStream` carrying the agent's audio, for analysis only.
+     *
+     * The visualizer in the island needs the agent's real frequency content. This
+     * wraps the same `MediaStreamTrack` the `<audio>` element is already playing,
+     * so tapping it costs nothing and does not open a second capture: playback is
+     * untouched and still owned by `attachAgentAudio`.
+     *
+     * Returns null whenever there is no agent track, which includes every moment
+     * before the agent is published. Callers must treat null as "no audio right
+     * now" rather than as an error, because that is the normal state between
+     * turns — the SDK ends the agent's track as each turn completes and a new one
+     * arrives for the next.
+     */
+    getAgentAudioStream() {
+      if (!agentAudioTrack || agentAudioTrack.kind !== Track.Kind.Audio) return null
+      if (!agentAudioStream || agentAudioStream.getTracks().length === 0) {
+        agentAudioStream = new MediaStream([agentAudioTrack.mediaStreamTrack])
+      }
+      return agentAudioStream
+    },
+
+    /**
+     * A `MediaStream` carrying the local microphone, for analysis only.
+     *
+     * Same idea as `getAgentAudioStream()` on the other end of the conversation:
+     * the island shows the user's own voice levels while the agent is thinking.
+     * Null whenever the microphone is not published, which includes a muted user.
+     */
+    getMicrophoneStream() {
+      const publication = room?.localParticipant?.getTrackPublication(Track.Source.Microphone)
+      const track = publication?.track
+      if (!track || track.kind !== Track.Kind.Audio) return null
+      // Cached for the same reason as `getAgentAudioStream()`: stable identity, so
+      // the visualizer does not rebuild its analyser on every render.
+      if (!microphoneStream || microphoneStream.getTracks().length === 0) {
+        microphoneStream = new MediaStream([track.mediaStreamTrack])
+      }
+      return microphoneStream
     },
 
     getConnectionState() {
