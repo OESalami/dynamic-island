@@ -31,22 +31,38 @@ export const contentTransition = {
   ease: 'easeOut',
 }
 
+/*
+ * The island hangs from the top edge of the screen, so only its two bottom
+ * corners are rounded; the top two stay square so the shape meets the screen
+ * edge cleanly. Bottom radii are half the height, giving a fully rounded lower
+ * edge in both shapes, and are named individually so Framer Motion can morph
+ * them (a single `borderRadius` would round all four corners).
+ */
 const COLLAPSED = {
   width: 128,
   height: 40,
-  borderRadius: 999,
+  borderTopLeftRadius: 0,
+  borderTopRightRadius: 0,
+  borderBottomLeftRadius: 20,
+  borderBottomRightRadius: 20,
 }
 
 const EXPANDED = {
   width: 260,
   height: 56,
-  borderRadius: 28,
+  borderTopLeftRadius: 0,
+  borderTopRightRadius: 0,
+  borderBottomLeftRadius: 28,
+  borderBottomRightRadius: 28,
 }
 
+// Scale/opacity only: the island sits flush against the top edge, so there is no
+// vertical travel left to animate. `transformOrigin` is pinned to the top in the
+// component so it grows down out of the edge rather than from its centre.
 export const islandContainer = {
-  initial: { opacity: 0, scale: 0.92, y: -8 },
-  animate: { opacity: 1, scale: 1, y: 0 },
-  exit: { opacity: 0, scale: 0.92, y: -8 },
+  initial: { opacity: 0, scale: 0.92 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.92 },
   transition: {
     type: 'tween',
     duration: DURATION.presence,

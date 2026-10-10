@@ -18,7 +18,7 @@ export function IslandContent({ state, isCollapsed }) {
         exit="exit"
         className="text-[11px] font-medium tracking-[0.14em] text-white/70"
       >
-        JARVIS
+        ELIGWEB AI
       </motion.span>
     )
   }
@@ -32,7 +32,7 @@ export function IslandContent({ state, isCollapsed }) {
         exit="exit"
         className="text-[13px] font-semibold tracking-[0.14em] text-white"
       >
-        JARVIS
+        ELIGWEB AI
       </motion.span>
       <span className="h-3 w-px bg-white/15" />
       <motion.span

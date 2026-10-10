@@ -56,8 +56,11 @@ export const ISLAND_SIZE = {
   WIDTH: 560,
   /** Height of the transparent canvas. */
   HEIGHT: 120,
-  /** Gap between the top of the work area and the top of the canvas. */
-  TOP_OFFSET: 8,
+  /**
+   * Gap between the top of the work area and the top of the canvas. Zero so the
+   * canvas — and therefore the island — sits flush against the top screen edge.
+   */
+  TOP_OFFSET: 0,
 }
 
 /** Vite dev server. Must match `server.port` in vite.config.js. */

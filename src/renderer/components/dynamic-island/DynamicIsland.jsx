@@ -14,7 +14,7 @@ import { islandContainer, islandShape, shapeTransition } from './islandVariants.
  *
  * Two nested motion elements, so the two concerns animate independently:
  *   outer -> presence (opacity + scale), also owns hover / click-through
- *   inner -> shape (width, height, border-radius)
+ *   inner -> shape (width, height, corner radii)
  *
  * Exit is a handshake: `onExitComplete` tells the main process the fade finished,
  * which is the signal it waits for before actually hiding the window. Hiding on
@@ -37,6 +37,7 @@ export function DynamicIsland({ state }) {
           exit="exit"
           onPointerEnter={onPointerEnter}
           onPointerLeave={onPointerLeave}
+          style={{ transformOrigin: 'top center' }}
           className="pointer-events-auto flex cursor-default"
         >
           <motion.div

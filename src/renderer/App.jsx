@@ -14,7 +14,7 @@ export default function App() {
   return (
     // pointer-events-none so the transparent canvas never intercepts clicks;
     // the island itself opts back in via pointer-events-auto.
-    <div className="flex size-full items-start justify-center bg-transparent pt-2 pointer-events-none">
+    <div className="flex size-full items-start justify-center bg-transparent pointer-events-none">
       <DynamicIsland state={state} />
     </div>
   )
