@@ -6,10 +6,10 @@ import {
   isIslandState,
 } from '../../shared/islandStates.js'
 import {
-  getIslandWindow,
   hideIslandWindow,
   isIslandWindowVisible,
   repositionIslandWindow,
+  sendToIslandRenderer,
   showIslandWindow,
 } from '../windows/islandWindow.js'
 
@@ -28,13 +28,16 @@ let autoHideTimer = null
 let dismissalPending = false
 
 function send(channel, payload) {
-  const window = getIslandWindow()
-  if (!window || window.isDestroyed()) return
-  window.webContents.send(channel, payload)
+  sendToIslandRenderer(channel, payload)
 }
 
 export function getState() {
   return state
+}
+
+export function syncRendererState() {
+  send(IPC.STATE_CHANGE, state)
+  send(IPC.VISIBILITY_CHANGE, isIslandWindowVisible())
 }
 
 function clearAutoHide() {

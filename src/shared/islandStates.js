@@ -9,6 +9,10 @@
  *
  *   hidden -> idle -> listening -> processing -> responding -> idle
  *   success | error  (transient, auto-dismiss back to idle)
+ *
+ * Once a voice session is live it cycles `listening <-> processing <-> responding`
+ * for as long as the agent is connected (see the transition table), and returns to
+ * `idle`/`hidden` when the session ends.
  */
 
 export const ISLAND_STATES = {
@@ -65,17 +69,27 @@ const TRANSITIONS = {
     ISLAND_STATES.HIDDEN,
     ISLAND_STATES.IDLE,
     ISLAND_STATES.PROCESSING,
+    // A live voice session loops: the agent can answer without an intervening
+    // `thinking` step (a greeting, or barge-in being declined).
+    ISLAND_STATES.RESPONDING,
     ISLAND_STATES.ERROR,
   ],
   [ISLAND_STATES.PROCESSING]: [
     ISLAND_STATES.HIDDEN,
     ISLAND_STATES.IDLE,
     ISLAND_STATES.RESPONDING,
+    // The agent gave up on the turn (silence timeout) and is listening again.
+    ISLAND_STATES.LISTENING,
     ISLAND_STATES.ERROR,
   ],
   [ISLAND_STATES.RESPONDING]: [
     ISLAND_STATES.HIDDEN,
     ISLAND_STATES.IDLE,
+    // Handing the turn back is the normal end of every agent turn, so the
+    // listening/responding cycle has to be legal in both directions. `processing`
+    // covers the user talking over the agent or asking a follow-up immediately.
+    ISLAND_STATES.LISTENING,
+    ISLAND_STATES.PROCESSING,
     ISLAND_STATES.SUCCESS,
     ISLAND_STATES.ERROR,
   ],

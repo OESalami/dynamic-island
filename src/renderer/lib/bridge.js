@@ -20,6 +20,10 @@ const fallback = {
   onVisibilityChange: () => noopUnsubscribe,
   notifyAnimationComplete: noop,
   setMouseInteractive: noop,
+  onSessionCommand: () => noopUnsubscribe,
+  notifyRendererReady: noop,
+  sendSessionStatus: noop,
+  writeLog: noop,
 }
 
 export const bridge = globalThis.window?.jarvisIsland ?? fallback

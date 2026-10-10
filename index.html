@@ -9,10 +9,19 @@
       declared here instead. style-src needs 'unsafe-inline' because Framer
       Motion writes inline style attributes; connect-src allows the Vite HMR
       websocket in development.
+
+      The LIVEKIT_ORIGINS placeholder in connect-src is replaced at build time
+      by the origins of VITE_LIVEKIT_URL and VITE_LIVEKIT_TOKEN_ENDPOINT (see
+      the `jarvis-livekit-csp` plugin in vite.config.js). Only those two origins
+      are added: the renderer can reach the LiveKit signal server and the backend
+      token endpoint, and nothing else. `media-src` is present for the remote
+      agent audio element the LiveKit SDK attaches to. The placeholder becomes
+      empty when LiveKit is unconfigured, which leaves the rest of the policy
+      intact.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self' blob: mediastream:; connect-src 'self' ws: wss: %LIVEKIT_ORIGINS%; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>JARVIS Dynamic Island</title>
   </head>

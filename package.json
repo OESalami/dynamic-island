@@ -3,7 +3,7 @@
   "productName": "JARVIS Dynamic Island",
   "private": true,
   "version": "0.1.0",
-  "description": "System-level Dynamic Island overlay for a JARVIS desktop assistant. Visual layer only.",
+  "description": "System-level Dynamic Island overlay for a JARVIS desktop assistant, with LiveKit voice sessions.",
   "type": "module",
   "main": "src/main/main.js",
   "scripts": {
@@ -31,6 +31,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
+    "livekit-client": "^2.22.3",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.0"
   },
@@ -52,7 +53,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
