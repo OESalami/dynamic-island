@@ -1,9 +1,7 @@
 import { app, screen } from 'electron'
 import { DEV_SERVER_URL } from '../shared/constants.js'
 import { registerIpcHandlers } from './ipc/index.js'
-import { onDisplayChanged, requestState } from './island/islandController.js'
-import { installMediaPermissions } from './session/mediaPermissions.js'
-import { shutdownSession, toggleSession } from './session/sessionController.js'
+import { onDisplayChanged, requestState, toggle } from './island/islandController.js'
 import { ShortcutManager } from './shortcuts/globalShortcuts.js'
 import {
   createIslandWindow,
@@ -27,16 +25,12 @@ if (!app.requestSingleInstanceLock()) {
 
 function bootstrap() {
   app.on('second-instance', () => {
-    // A second launch is the same gesture as the shortcut, not a request to
-    // reveal the island: it starts the session if there is none, and stops the
-    // one already running.
-    toggleSession()
+    toggle()
   })
 
   app.whenReady().then(async () => {
     createIslandWindow()
     registerIpcHandlers()
-    installMediaPermissions()
     wireShortcuts()
 
     if (app.isPackaged) {
@@ -59,17 +53,10 @@ function bootstrap() {
   app.on('window-all-closed', () => {
     app.quit()
   })
-
-  // Release the microphone if the app is on its way out with a session running.
-  // The renderer may already be gone, in which case the OS reclaims the device
-  // when the process exits; this only makes the attempt while it is still useful.
-  app.on('before-quit', () => {
-    shutdownSession()
-  })
 }
 
 function wireShortcuts() {
-  shortcuts.onTrigger('toggle', () => toggleSession())
+  shortcuts.onTrigger('toggle', () => toggle())
   shortcuts.onTrigger('set-state', (state) => requestState(state))
   shortcuts.register()
 }
