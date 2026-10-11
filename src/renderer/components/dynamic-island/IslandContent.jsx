@@ -1,8 +1,8 @@
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ThinkingOrb } from 'thinking-orbs'
 import { STATE_LABELS } from '../../../shared/islandStates.js'
 import { ISLAND_STATE_TO_ORB_STATE } from './orbStates.js'
-import { contentFade } from './islandVariants.js'
+import { contentFade, contentTransition } from './islandVariants.js'
 
 /**
  * Renders the inside of the island for the current state.
@@ -36,7 +36,18 @@ export function IslandContent({ state, isCollapsed }) {
         exit="exit"
         className="text-[11px] font-medium tracking-[0.14em] text-white/70"
       >
-        {orbState ? <ThinkingOrb {...orbProps(state)} /> : 'ELIGWEB AI'}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={orbState ?? 'label'}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={contentTransition}
+            className="flex items-center"
+          >
+            {orbState ? <ThinkingOrb {...orbProps(state)} /> : 'ELIGWEB AI'}
+          </motion.span>
+        </AnimatePresence>
       </motion.span>
     )
   }
@@ -58,9 +69,20 @@ export function IslandContent({ state, isCollapsed }) {
         initial="initial"
         animate="animate"
         exit="exit"
-        className="flex items-center"
+        className="relative flex h-8 w-8 items-center justify-center"
       >
-        <ThinkingOrb {...orbProps(state)} />
+        <AnimatePresence initial={false}>
+          <motion.span
+            key={orbState}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={contentTransition}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <ThinkingOrb {...orbProps(state)} />
+          </motion.span>
+        </AnimatePresence>
       </motion.span>
     </div>
   )

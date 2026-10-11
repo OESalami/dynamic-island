@@ -47,7 +47,11 @@ export function DynamicIsland({ state }) {
             className="flex items-center justify-center overflow-hidden bg-black shadow-[0_6px_24px_rgba(0,0,0,0.45)]"
           >
             <AnimatePresence mode="wait" initial={false}>
-              <IslandContent key={state} state={state} isCollapsed={isCollapsed} />
+              <IslandContent
+                key={isCollapsed ? 'collapsed' : 'expanded'}
+                state={state}
+                isCollapsed={isCollapsed}
+              />
             </AnimatePresence>
           </motion.div>
         </motion.div>
