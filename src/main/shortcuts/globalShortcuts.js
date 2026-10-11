@@ -6,8 +6,8 @@ import { ACCELERATOR, DEV_ACCELERATOR, DEV_STATE_CYCLE } from '../../shared/cons
  *
  * The rest of the app only calls `onTrigger(cb)` and never learns how the
  * combination is detected, which is what keeps the shortcut mechanism
- * replaceable. See ACCELERATOR in shared/constants.js for why the intended
- * binding is `Ctrl+Alt+Space` and not a bare `Ctrl+Alt`.
+ * replaceable. See ACCELERATOR in shared/constants.js for why the binding is
+ * `Alt+Space` and not a bare `Ctrl+Alt`.
  *
  * Replacing this implementation with a modifier-only Windows keyboard hook
  * (`SetWindowsHookEx` / `WH_KEYBOARD_LL`, usually via a native module) means

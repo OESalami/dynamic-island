@@ -311,7 +311,7 @@ All tuning lives in `src/shared/constants.js` and `src/shared/islandStates.js`. 
 | `ISLAND_SIZE.WIDTH` / `HEIGHT` | 560 × 120 | Transparent canvas size. Must exceed the widest expanded shape. |
 | `ISLAND_SIZE.TOP_OFFSET` | 8 | Gap between the top of the work area and the top of the canvas. |
 | `AUTO_HIDE_MS` | 4000 | Delay before `success` / `error` auto-dismiss. |
-| `ACCELERATOR` | `Ctrl+Alt+Space` | Toggle binding. |
+| `ACCELERATOR` | `Alt+Space` | Toggle binding. |
 | `DEV_STATE_CYCLE` | 7 states | The sequence the dev shortcut walks. |
 | `islandShape` | 128×40 pill / 260×56 card | Geometry per shape, in `islandVariants.js`. |
 | `DURATION` | shape 0.34s, content 0.16s, presence 0.26s | The motion language. |

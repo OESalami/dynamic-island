@@ -72,20 +72,24 @@ export const DEV_SERVER_TIMEOUT_MS = 30_000
 /**
  * Primary trigger: start or stop a JARVIS voice session.
  *
- * The intended binding is a bare `Ctrl+Alt`, but Electron's `globalShortcut`
- * cannot express it: Chromium's accelerator parser rejects any combination with
- * no non-modifier key (electron/shell/browser/ui/accelerator_util.cc returns
- * false when the key is VKEY_UNKNOWN). A modifier-only trigger on Windows needs
- * a low-level keyboard hook (`SetWindowsHookEx` / `WH_KEYBOARD_LL`, usually via a
- * native module). That is deliberately not pulled in yet — see
- * ShortcutManager for the seam where it would live.
+ * Bound to `Alt+Space`. A modifier-only trigger (the original intent was a bare
+ * `Ctrl+Alt`) is not expressible through Electron's `globalShortcut`: Chromium's
+ * accelerator parser rejects any combination with no non-modifier key
+ * (electron/shell/browser/ui/accelerator_util.cc returns false when the key is
+ * VKEY_UNKNOWN). A modifier-only trigger on Windows needs a low-level keyboard
+ * hook (`SetWindowsHookEx` / `WH_KEYBOARD_LL`, usually via a native module).
+ * That is deliberately not pulled in yet — see ShortcutManager for the seam
+ * where it would live.
+ *
+ * Note: `Alt+Space` is also Windows' system-menu chord, but a registered global
+ * shortcut takes precedence over the focused window's system menu.
  *
  * The binding carries the session lifecycle, not island visibility: the first
  * press starts a session (token, connect, microphone), the second stops it and
  * dismisses the island. Pressing it while a session is still connecting stops
  * that attempt, so a session can never be doubled by pressing twice.
  */
-export const ACCELERATOR = 'Ctrl+Alt+Space'
+export const ACCELERATOR = 'Alt+Space'
 
 /**
  * Dev-only shortcut that advances the island one step through the state model.
