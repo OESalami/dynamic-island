@@ -1,6 +1,6 @@
 import { IPC } from '../../shared/constants.js'
 import { ISLAND_STATES } from '../../shared/islandStates.js'
-import { SESSION_PHASES, isSessionPhase, isTerminalPhase } from '../../shared/sessionPhases.js'
+import { SESSION_PHASES, isLivePhase, isSessionPhase, isTerminalPhase } from '../../shared/sessionPhases.js'
 import { getState, hide, requestState, show } from '../island/islandController.js'
 import {
   getIslandWindow,
@@ -116,6 +116,36 @@ export function stopSession() {
 /** The accelerator's new meaning: start a session, or stop the one that is running. */
 export function toggleSession() {
   return activePhase ? stopSession() : startSession()
+}
+
+/** True while a session is connected and able to carry media. */
+export function isLiveSession() {
+  return isLivePhase(activePhase)
+}
+
+/**
+ * Toggle the screen share: what the share accelerator asks for.
+ *
+ * The main process only relays the user's keypress; the renderer owns the share
+ * track, because it is the half of the app that holds the Room. Gated here on a
+ * live session so a stray keypress can never ask the renderer to open a capture
+ * while there is nothing to share into. `toggle` is the whole command because
+ * only the renderer knows whether a share is actually up.
+ */
+export function toggleScreenShare() {
+  if (!isLiveSession()) {
+    console.warn('[jarvis-session] screen share ignored: no live session to share into.')
+    return false
+  }
+  const sent = sendToIslandRenderer(IPC.SHARE_COMMAND, {
+    command: 'toggle',
+    sessionId: activeSessionId,
+  })
+  if (!sent) {
+    console.warn('[jarvis-session] screen share ignored: no renderer to receive the command.')
+    return false
+  }
+  return true
 }
 
 /**

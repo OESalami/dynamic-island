@@ -54,3 +54,21 @@ export function isSessionPhase(value) {
 export function isTerminalPhase(phase) {
   return phase === SESSION_PHASES.STOPPED || phase === SESSION_PHASES.ERROR
 }
+
+/**
+ * The phases in which a session is connected and can carry media.
+ *
+ * `starting`/`connecting` are refused: there is no room to share into yet.
+ * `stopping` is a session on its way out. Only the three connected phases may
+ * publish a screen track.
+ */
+const LIVE_PHASES = Object.freeze([
+  SESSION_PHASES.LISTENING,
+  SESSION_PHASES.THINKING,
+  SESSION_PHASES.SPEAKING,
+])
+
+/** True while a session is connected and able to carry media. */
+export function isLivePhase(phase) {
+  return LIVE_PHASES.includes(phase)
+}

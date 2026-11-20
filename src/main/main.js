@@ -1,9 +1,9 @@
 import { app, screen } from 'electron'
-import { DEV_SERVER_URL } from '../shared/constants.js'
+import { DEV_SERVER_URL, SHARE_ACCELERATOR } from '../shared/constants.js'
 import { registerIpcHandlers } from './ipc/index.js'
 import { onDisplayChanged, requestState } from './island/islandController.js'
 import { installMediaPermissions } from './session/mediaPermissions.js'
-import { shutdownSession, toggleSession } from './session/sessionController.js'
+import { shutdownSession, toggleScreenShare, toggleSession } from './session/sessionController.js'
 import { ShortcutManager } from './shortcuts/globalShortcuts.js'
 import {
   createIslandWindow,
@@ -16,6 +16,10 @@ import {
 app.enableSandbox()
 
 const shortcuts = new ShortcutManager({ devCycle: !app.isPackaged })
+
+// One accelerator per manager instance, so the screen-share trigger can never be
+// mistaken for — or fire alongside — the session toggle.
+const shareShortcuts = new ShortcutManager({ accelerator: SHARE_ACCELERATOR })
 
 // A second instance would render a second island in the same spot. This must be
 // requested before `ready`.
@@ -72,4 +76,7 @@ function wireShortcuts() {
   shortcuts.onTrigger('toggle', () => toggleSession())
   shortcuts.onTrigger('set-state', (state) => requestState(state))
   shortcuts.register()
+
+  shareShortcuts.onTrigger('toggle', () => toggleScreenShare())
+  shareShortcuts.register()
 }

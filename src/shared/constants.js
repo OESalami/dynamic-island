@@ -41,6 +41,8 @@ export const IPC = {
   VISIBILITY_CHANGE: 'island:visibility-change',
   /** main -> renderer: start or stop the JARVIS voice session */
   SESSION_COMMAND: 'island:session-command',
+  /** main -> renderer: toggle the screen share within a live session */
+  SHARE_COMMAND: 'island:screen-share-command',
 }
 
 /**
@@ -90,6 +92,22 @@ export const DEV_SERVER_TIMEOUT_MS = 30_000
  * that attempt, so a session can never be doubled by pressing twice.
  */
 export const ACCELERATOR = 'Alt+Space'
+
+/**
+ * Screen-share toggle: start or stop sharing the primary display to the agent.
+ *
+ * Bound to `Alt+Shift+S`. The original intent was `Alt+Space+S` — the session
+ * toggle plus `S` — but Chromium's accelerator parser keeps only the last
+ * non-modifier key, so that string silently collapses to `Alt+S` and would
+ * double-fire with the `Alt+Space` session toggle on a real press. `Alt+Shift+S`
+ * keeps the S key family and is distinct from every registered binding. The
+ * probe that established this lives in scripts/shortcut-check.mjs.
+ *
+ * The binding is inert unless a voice session is live: the main process only
+ * relays it to the renderer while a session is in `listening`/`thinking`/
+ * `speaking`, and the renderer never opens a capture on its own.
+ */
+export const SHARE_ACCELERATOR = 'Alt+Shift+S'
 
 /**
  * Dev-only shortcut that advances the island one step through the state model.

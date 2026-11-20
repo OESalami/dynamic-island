@@ -87,6 +87,12 @@ const islandApi = {
    * start and stop, and reports back what happened.
    */
   onSessionCommand: (callback) => subscribe(CH.SESSION_COMMAND, callback),
+  /**
+   * Subscribe to screen share commands (toggle). Returns an unsubscribe
+   * function. The renderer owns the share track; main only relays the user's
+   * keypress while a session is live.
+   */
+  onShareCommand: (callback) => subscribe(CH.SHARE_COMMAND, callback),
   /** Tell the main process that renderer listeners are ready to receive events. */
   notifyRendererReady: () => ipcRenderer.send(CH.RENDERER_READY),
 

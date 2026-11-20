@@ -24,7 +24,7 @@ function orbProps(state) {
   }
 }
 
-export function IslandContent({ state, isCollapsed }) {
+export function IslandContent({ state, isCollapsed, sharing }) {
   const orbState = ISLAND_STATE_TO_ORB_STATE[state]
 
   if (isCollapsed) {
@@ -53,7 +53,7 @@ export function IslandContent({ state, isCollapsed }) {
   }
 
   return (
-    <div className="flex items-center gap-3 px-5">
+    <div className="relative flex items-center gap-3 px-5">
       <motion.span
         variants={contentFade}
         initial="initial"
@@ -84,6 +84,16 @@ export function IslandContent({ state, isCollapsed }) {
           </motion.span>
         </AnimatePresence>
       </motion.span>
+      {sharing && (
+        <span
+          title="Screen sharing is on — press Alt+Shift+S to stop"
+          aria-label="Screen sharing is active"
+          className="absolute right-2 top-2 flex h-2 w-2"
+        >
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+        </span>
+      )}
     </div>
   )
 }

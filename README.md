@@ -35,6 +35,8 @@ Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> to start a voice session, 
 
 The island can still be shown and hidden on its own (click it while a session is not running) — the accelerator is bound to the session because that is the more useful binding when a session exists.
 
+While a session is running, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> starts sharing the primary display with the agent, and presses it again to stop. A small pulsing dot appears on the island while sharing. See [Agent-side vision spec](docs/agent-vision-spec.md) for what `my-agent` must do with the video track.
+
 ## Scripts
 
 | Script | What it does |
@@ -56,7 +58,7 @@ src/
     ipc/index.js            Every renderer-facing IPC channel, sender-verified
     island/islandController.js   Authoritative state + window visibility
     session/sessionController.js Session lifecycle: which phase, which island state
-    session/mediaPermissions.js  Grants `media` and nothing else
+    session/mediaPermissions.js  Grants `media` + `display-capture`; gates screen capture
     windows/islandWindow.js      The single BrowserWindow; owns every window option
     shortcuts/globalShortcuts.js Global accelerator registration and fan-out
     utils/screen.js         Display/work-area maths
@@ -74,6 +76,7 @@ src/
       islandVariants.js     The motion language (easings, durations, geometry)
     hooks/useIslandState.js Mirrors main-owned state
     hooks/useJarvisSession.js  Wires session commands, phases and logs over IPC
+    hooks/useScreenShareState.js  Mirrors screen share state for the UI chip
     hooks/useMousePassthrough.js  Flips click-through on hover
     lib/bridge.js           The single access point to `window.jarvisIsland`
     livekit/                The only code that knows LiveKit exists
@@ -102,7 +105,7 @@ A voice session is split across the process boundary, because neither process ca
 
 | | Main process | Renderer |
 | --- | --- | --- |
-| Owns | Whether a session exists, the island, the window | The `Room`, the microphone, the audio elements |
+| Owns | Whether a session exists, the island, the window | The `Room`, the microphone, the screen share, the audio elements |
 | Can do | Decide, sequence, refuse | `getUserMedia`, WebRTC, `track.attach()` |
 
 `session/sessionController.js` is the main half: the accelerator asks it to `toggleSession()`, it shows the island, and it tells the renderer to start or stop. The renderer reports progress as a **phase** — a transport fact ("we are asking for a token") — and main maps phases onto island states. That mapping exists in exactly one place:
@@ -199,6 +202,16 @@ The microphone is enabled **only** while a session is running and is released by
 
 Agent audio has no player in the UI: the SDK's `track.attach()` element is appended to the renderer document and played immediately, `room.startAudio()` is the fallback if a platform refuses, and every element is paused, detached and removed on unsubscribe or teardown. The same subscribed audio track is analyzed for speech to drive the `responding` state. The window is created with `autoplayPolicy: 'no-user-gesture-required'` because it is a `focusable: false` overlay and there is no gesture to play against.
 
+#### Screen sharing (vision)
+
+The desktop can publish the primary display — whole screen, video-only — into the live room while a session is connected. <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> toggles it. The renderer owns the `screen_share` track exactly like it owns the microphone, and the main process only relays the keypress while the session is live (`listening`/`thinking`/`speaking`). The renderer's `getDisplayMedia` is answered by a `setDisplayMediaRequestHandler` in main that refuses unless a session is live *and* the island's own frame asked, and that resolves only the primary screen. There is no chooser window and no `screen_share_audio` in v1.
+
+The indicator is renderer UI, not island state: a small pulsing red dot on the expanded card is driven by `useScreenShareState`, so the state machine and the IPC surface did not change shape for it.
+
+Unlike a microphone failure, a refused or failed share **does not end the session** — the room, mic and agent stay up, and the outcome is a log line with a code (`screen-share-denied` / `screen-share-unavailable` / `screen-share-failed`). The island's `error` state stays reserved for session failures.
+
+The agent half of the feature lives at [Agent-side vision spec](docs/agent-vision-spec.md): `my-agent` can consume the track with realtime video input (Gemini Live / OpenAI Realtime) or by sampling frames into the chat context.
+
 #### Failure modes
 
 | Code | Cause |
@@ -207,15 +220,18 @@ Agent audio has no player in the UI: the SDK's `track.attach()` element is appen
 | `token-unavailable` / `token-rejected` / `token-invalid` | Endpoint unreachable, non-2xx, or unusable body |
 | `connect-failed` / `connection-lost` | LiveKit unreachable, or the room dropped |
 | `microphone-denied` / `microphone-unavailable` / `microphone-failed` | Permission refused, no device, or capture failed |
+| `screen-share-denied` / `screen-share-unavailable` / `screen-share-failed` | Share refused by the system, no screen source, or capture failed |
 | `audio-playback-blocked` | Attached element refused to play |
 | `audio-subscription-failed` | The agent's audio track could not be subscribed |
 | `agent-left` | The agent disconnected mid-session |
 
 All of them end in the same place: one code, one message, a teardown, and the island's `error` state. Errors are logged to the main-process console with the code and a redacted message.
 
+The screen-share codes are the one deliberate exception: a refused or failed share is logged with its code and the chip stays off, but the session continues — the microphone, the agent and the island's audio state are untouched.
+
 #### What is deliberately absent
 
-No screen sharing, no camera, no chat or text channel, no transcripts, no push-to-talk mode, no session history. The bridge exposes no API for any of them, and the island UI was not redesigned to host them.
+No camera, no chat or text channel, no transcripts, no push-to-talk mode, no session history. Screen sharing is in (see [Screen sharing (vision)](#screen-sharing-vision)); everything else here stays absent, and the bridge exposes no API for any of it.
 
 #### Verification status
 
@@ -225,6 +241,8 @@ No screen sharing, no camera, no chat or text channel, no transcripts, no push-t
 | `content-security-policy` grants exactly the configured origins | Verified in the built `index.html` |
 | Microphone capture over `file://` with the app's own window flags | Verified — a real device track was obtained |
 | Single-session rule, toggle, stop, error state, restart after failure | Verified against the real main process and the built renderer |
+| Screen share: session-live gate, island-frame gate, no-screen-source refusal, primary-display grant | Verified — main-process display-media probe, no LiveKit needed |
+| Screen share published into a live room and consumed by the agent | **Not verified — same gap as the LiveKit room row below** |
 | **LiveKit room, `my-agent` dispatch, agent audio on Windows** | **Not verified — needs a real project URL, a real token endpoint and credentials** |
 
 The last row is the honest gap: everything up to the WebRTC handshake is exercised, and the handshake itself has never run against a live LiveKit deployment from this machine.
@@ -263,7 +281,7 @@ The window is set to `setIgnoreMouseEvents(true, { forward: true })`. `forward: 
 | `sandbox` | `true` |
 | `webSecurity` | `true` |
 | CSP | Declared as a `<meta>` tag in `index.html` — production loads over `file://`, where a header cannot be set. The LiveKit origins are injected into `connect-src` at build time (see below). |
-| Media permission | `session/mediaPermissions.js` grants Electron's `media` permission — the microphone — and refuses everything else. There is deliberately no `display-media` handler, so screen capture cannot be granted even if something asks. |
+| Media permission | `session/mediaPermissions.js` grants Electron's `media` and `display-capture` — but only to the island renderer, and screen capture additionally must pass a `setDisplayMediaRequestHandler` that refuses without a live session and resolves only the primary display. Everything else is still denied. |
 | Autoplay | `autoplayPolicy: 'no-user-gesture-required'`, required for agent audio in a `focusable: false` overlay. |
 | Access tokens | The renderer receives a short-lived join token and nothing else. API keys and secrets stay on the backend; a `VITE_*` name that looks like a credential fails the build. Tokens are redacted in every log line, and the SDK's own logger is reduced to warnings because it prints the signalling URL — which carries the token as a query parameter. |
 | Bridge surface | One global, `window.jarvisIsland`, with a fixed set of functions. `Node`, `process`, `fs`, `shell` and raw `ipcRenderer` are never exposed. |
@@ -281,6 +299,7 @@ The window is set to `setIgnoreMouseEvents(true, { forward: true })`. `forward: 
 | Accelerator | Action | Availability |
 | --- | --- | --- |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> | Start a voice session, or stop the running one | Always |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> | Start/stop sharing the primary display into a live session | Always (inert until a session is live) |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> | Advance one step through the state model | Unpackaged only |
 
 `globalShortcut.register` fails silently when another app already owns a combination, so the manager logs a warning when registration is refused. A second launch of the app routes the same accelerator to the running instance, so the shortcut cannot start two sessions.
@@ -299,6 +318,7 @@ The window is set to `setIgnoreMouseEvents(true, { forward: true })`. `forward: 
 | `island:state-change` | main → renderer | state string |
 | `island:visibility-change` | main → renderer | boolean |
 | `island:session-command` | main → renderer | `start` / `stop` + session id |
+| `island:screen-share-command` | main → renderer | `toggle` + session id |
 | `island:session-status` | renderer → main | phase, session id, optional error code and message |
 | `island:log` | renderer → main | one `[JARVIS]` line, redacted |
 
@@ -311,7 +331,8 @@ All tuning lives in `src/shared/constants.js` and `src/shared/islandStates.js`. 
 | `ISLAND_SIZE.WIDTH` / `HEIGHT` | 560 × 120 | Transparent canvas size. Must exceed the widest expanded shape. |
 | `ISLAND_SIZE.TOP_OFFSET` | 8 | Gap between the top of the work area and the top of the canvas. |
 | `AUTO_HIDE_MS` | 4000 | Delay before `success` / `error` auto-dismiss. |
-| `ACCELERATOR` | `Alt+Space` | Toggle binding. |
+| `ACCELERATOR` | `Alt+Space` | Session toggle binding. |
+| `SHARE_ACCELERATOR` | `Alt+Shift+S` | Screen-share toggle. `Alt+Space+S` was the intent, but Chromium's accelerator parser collapses it to `Alt+S` — see the constant's comment. |
 | `DEV_STATE_CYCLE` | 7 states | The sequence the dev shortcut walks. |
 | `islandShape` | 128×40 pill / 260×56 card | Geometry per shape, in `islandVariants.js`. |
 | `DURATION` | shape 0.34s, content 0.16s, presence 0.26s | The motion language. |
@@ -353,6 +374,7 @@ These are deliberate seams, each documented at its implementation site:
 - **Modifier-only trigger is not possible.** The intended binding is a bare `Ctrl+Alt`, but Chromium's accelerator parser rejects any combination with no non-modifier key. A modifier-only trigger on Windows needs a low-level keyboard hook (`SetWindowsHookEx` / `WH_KEYBOARD_LL`), i.e. a native dependency. `ShortcutManager` is the seam: write a class with the same three methods and swap it in `main.js` — nothing else changes.
 - **No click-away dismissal.** The window is `focusable: false`, so the OS never fires `blur` for it. Auto-dismiss is therefore time-based. To get real click-away dismissal, flip `focusable` to `true` in `islandWindow.js` (keep `showInactive()`, which still avoids stealing focus) and hide on `blur`.
 - **Primary display only.** `screen.js` already exposes `getWorkAreaAtPoint` / `getIslandBoundsAtPoint` so the island can follow the cursor or the active window once multi-monitor support lands, without changing the positioning contract.
+- **Screen share is whole-primary-display only.** v1 has no source picker and no window-level capture; `setDisplayMediaRequestHandler` always resolves the primary screen. A chooser, or window-level sharing, would be added at that handler — not in the renderer.
 - **Placeholder content.** `IslandContent` renders the state label only. There is no waveform, transcript, or tool output yet. Session phases map onto the existing states precisely so the UI could grow here without touching the state model.
 - **Agent state is inferred, not reported.** The LiveKit client has no agent-state API, so `thinking` and `responding` come from active-speaker detection. A server without active-speaker support leaves the island on `listening`.
 - **A room is created per session.** Pressing the shortcut twice joins two different rooms, so an agent that is already in the first room is not in the second. Explicit dispatch makes that correct; automatic dispatch with a sticky agent would need a stable room name.

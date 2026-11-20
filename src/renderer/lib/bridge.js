@@ -21,6 +21,7 @@ const fallback = {
   notifyAnimationComplete: noop,
   setMouseInteractive: noop,
   onSessionCommand: () => noopUnsubscribe,
+  onShareCommand: () => noopUnsubscribe,
   notifyRendererReady: noop,
   sendSessionStatus: noop,
   writeLog: noop,

@@ -1,4 +1,4 @@
-import { SESSION_PHASES } from '../../shared/sessionPhases.js'
+import { SESSION_PHASES, isLivePhase } from '../../shared/sessionPhases.js'
 import { describeLiveKitConfig, readLiveKitConfig } from './livekitConfig.js'
 import { createLiveKitClient } from './livekitClient.js'
 import {
@@ -17,7 +17,7 @@ import { createTokenSource, requestAccessToken } from './livekitToken.js'
  *
  *   start -> read config -> request token -> connect -> enable microphone
  *         -> wait for the agent
- *   stop  -> disable microphone -> unpublish -> stop local tracks
+ *   stop  -> disable microphone -> stop screen share -> stop local tracks
  *         -> remove remote audio elements -> disconnect -> clear references
  *
  * — and nothing else in the app needs to know that any of it involves LiveKit. The
@@ -89,6 +89,8 @@ class JarvisSession {
   /** Serialises work so two teardowns, or a teardown and a start, never interleave. */
   #queue = Promise.resolve()
   #listeners = new Set()
+  /** Screen share state listeners; notified on change and on teardown. */
+  #shareListeners = new Set()
 
   /** Subscribe to session phases. Returns an unsubscribe function. */
   onPhase(listener) {
@@ -129,6 +131,45 @@ class JarvisSession {
     const client = this.#attempt?.client
     if (!client) return false
     return client.setMicrophoneEnabled(enabled)
+  }
+
+  /**
+   * Publish or unpublish the desktop screen share mid-session.
+   *
+   * Enabling is refused unless the session is live and connected, so an early
+   * share keypress (or a stray command) can never open a capture during
+   * `starting`/`connecting`. Because a capture failure here must not take the
+   * voice session down, the client reports share failures as log lines rather
+   * than session failures.
+   *
+   * @returns {Promise<boolean>} whether the share ended up in the requested state.
+   */
+  async setScreenShareEnabled(enabled) {
+    const client = this.#attempt?.client
+    if (!client || !client.isConnected()) return false
+    if (enabled && !isLivePhase(this.#phase)) return false
+    return client.setScreenShareEnabled(enabled)
+  }
+
+  /** Flip the screen share on or off — what the share shortcut asks for. */
+  async toggleScreenShare() {
+    return this.setScreenShareEnabled(!this.getScreenShareEnabled())
+  }
+
+  /** Whether a screen share track is currently published on this session. */
+  getScreenShareEnabled() {
+    return this.#attempt?.screenShareEnabled ?? false
+  }
+
+  /**
+   * Subscribe to screen share state. Returns an unsubscribe function, and
+   * replays the current state immediately so a freshly mounted UI never guesses.
+   */
+  onShareStatus(listener) {
+    if (typeof listener !== 'function') return () => {}
+    this.#shareListeners.add(listener)
+    listener(this.getScreenShareEnabled())
+    return () => this.#shareListeners.delete(listener)
   }
 
   /**
@@ -211,6 +252,7 @@ class JarvisSession {
     const client = attempt.client
     attempt.client = null
     this.#listeners.clear()
+    this.#shareListeners.clear()
     if (client) void client.disconnect()
   }
 
@@ -226,6 +268,17 @@ class JarvisSession {
     for (const listener of this.#listeners) {
       try {
         listener(phase, detail)
+      } catch {
+        // A listener that throws must not interrupt the session teardown.
+      }
+    }
+  }
+
+  #emitShareStatus() {
+    const enabled = this.getScreenShareEnabled()
+    for (const listener of this.#shareListeners) {
+      try {
+        listener(enabled)
       } catch {
         // A listener that throws must not interrupt the session teardown.
       }
@@ -272,6 +325,11 @@ class JarvisSession {
     }
     if (event === SESSION_EVENTS.AGENT_AUDIO_PLAYBACK) {
       if (payload?.playing) jarvisLog('Agent audio playback started')
+      return
+    }
+    if (event === SESSION_EVENTS.SCREEN_SHARE) {
+      attempt.screenShareEnabled = Boolean(payload?.enabled)
+      this.#emitShareStatus()
       return
     }
 
@@ -399,6 +457,10 @@ class JarvisSession {
       this.#emitPhase(SESSION_PHASES.STOPPED)
       jarvisLog('Session disconnected')
     }
+    // The share lives on the attempt; with it gone the state is false, and the
+    // island's share indicator has to hear about it even though no track event
+    // fired (the client's listeners are already detached at this point).
+    this.#emitShareStatus()
   }
 }
 

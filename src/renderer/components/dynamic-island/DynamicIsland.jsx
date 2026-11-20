@@ -20,7 +20,7 @@ import { islandContainer, islandShape, shapeTransition } from './islandVariants.
  * which is the signal it waits for before actually hiding the window. Hiding on
  * the hide request instead would cut the animation off.
  */
-export function DynamicIsland({ state }) {
+export function DynamicIsland({ state, sharing }) {
   const isHidden = state === ISLAND_STATES.HIDDEN
   const isCollapsed = isCollapsedState(state)
   const shape = isCollapsed ? islandShape.collapsed : islandShape.expanded
@@ -51,6 +51,7 @@ export function DynamicIsland({ state }) {
                 key={isCollapsed ? 'collapsed' : 'expanded'}
                 state={state}
                 isCollapsed={isCollapsed}
+                sharing={sharing}
               />
             </AnimatePresence>
           </motion.div>

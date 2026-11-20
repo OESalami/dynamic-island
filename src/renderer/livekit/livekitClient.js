@@ -52,6 +52,11 @@ import { jarvisError, jarvisLog, jarvisWarn } from './livekitLogger.js'
  * Microphone: enabled only while a session is running, and released by
  * `disconnect()`. There is no background capture anywhere in this app, and
  * unpublishing the microphone is a mute — it never ends the session.
+ *
+ * Screen share: the same rule. Publishing goes through the main process's
+ * display media request handler, which only grants the primary display while a
+ * session is live. Unlike the microphone, a share failure must not end the
+ * session — a refused or failed capture leaves the voice session untouched.
  */
 
 /**
@@ -412,26 +417,40 @@ export function createLiveKitClient({ onEvent }) {
     on(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers)
 
     on(RoomEvent.LocalTrackPublished, (publication) => {
-      if (publication.source !== Track.Source.Microphone) return
-      jarvisLog(`Microphone published (track ${publication.trackSid ?? 'pending'})`)
-      emit(SESSION_EVENTS.MICROPHONE, { enabled: true })
+      if (publication.source === Track.Source.Microphone) {
+        jarvisLog(`Microphone published (track ${publication.trackSid ?? 'pending'})`)
+        emit(SESSION_EVENTS.MICROPHONE, { enabled: true })
+        return
+      }
+      if (publication.source === Track.Source.ScreenShare) {
+        jarvisLog(`Screen share published (track ${publication.trackSid ?? 'pending'})`)
+        emit(SESSION_EVENTS.SCREEN_SHARE, { enabled: true })
+      }
     })
 
     on(RoomEvent.LocalTrackUnpublished, (publication) => {
-      if (publication.source !== Track.Source.Microphone) return
-      // Unpublishing is a mute. The room, the agent and the session all stay up.
-      jarvisLog('Microphone unpublished; the session stays connected')
-      emit(SESSION_EVENTS.MICROPHONE, { enabled: false })
+      if (publication.source === Track.Source.Microphone) {
+        // Unpublishing is a mute. The room, the agent and the session all stay up.
+        jarvisLog('Microphone unpublished; the session stays connected')
+        emit(SESSION_EVENTS.MICROPHONE, { enabled: false })
+        return
+      }
+      if (publication.source === Track.Source.ScreenShare) {
+        jarvisLog('Screen share unpublished; the capture is released')
+        emit(SESSION_EVENTS.SCREEN_SHARE, { enabled: false })
+      }
     })
   }
 
   /**
-   * Release the microphone and every remaining local capture track.
+   * Release every local capture track this session owns — the microphone first,
+   * then the screen share — before the room is disconnected.
    *
-   * Only ever called from `disconnect()`. Muting the microphone mid-session goes
-   * through `setMicrophoneEnabled(false)` instead and never reaches this.
+   * Only ever called from `disconnect()`. Muting the microphone or stopping a
+   * share mid-session goes through `setMicrophoneEnabled(false)` /
+   * `setScreenShareEnabled(false)` instead and never reaches this.
    */
-  async function stopMicrophone() {
+  async function stopLocalCapture() {
     if (!room) return
     try {
       await room.localParticipant.setMicrophoneEnabled(false)
@@ -440,6 +459,12 @@ export function createLiveKitClient({ onEvent }) {
       // Teardown must finish even if the unpublish fails, so the tracks below are
       // stopped regardless.
       jarvisError('Unpublishing the microphone failed', error)
+    }
+    try {
+      await room.localParticipant.setScreenShareEnabled(false)
+      jarvisLog('Screen share release requested during cleanup')
+    } catch (error) {
+      jarvisError('Unpublishing the screen share failed', error)
     }
     for (const publication of room.localParticipant.trackPublications.values()) {
       publication.track?.stop()
@@ -492,7 +517,7 @@ export function createLiveKitClient({ onEvent }) {
       // can influence the room's fate.
       unwire()
 
-      await stopMicrophone()
+      await stopLocalCapture()
 
       for (const element of [...audioElements]) {
         disposeElement(element)
@@ -542,6 +567,35 @@ export function createLiveKitClient({ onEvent }) {
         const failure = describeFailure(error, SESSION_ERROR_CODES.MICROPHONE_FAILED)
         jarvisError('Microphone request failed', error)
         fail(failure.code, failure.message)
+        return false
+      }
+    },
+
+    /**
+     * Publish or unpublish the desktop screen share.
+     *
+     * A start reaches the SDK's `getDisplayMedia`, which Electron routes to the
+     * main process's display media request handler (mediaPermissions.js). That
+     * handler resolves only the primary screen and only while a session is live.
+     *
+     * Unlike the microphone, a share failure is deliberately not emitted as a
+     * session failure: a refused or failed capture leaves the room, the agent
+     * and the microphone untouched. The shared state reaches the UI through the
+     * SCREEN_SHARE event, which follows the actual local track publication.
+     *
+     * @returns {Promise<boolean>} whether the share ended up in the requested state.
+     */
+    async setScreenShareEnabled(enabled) {
+      if (!room) return false
+      jarvisLog(`Screen share ${enabled ? 'start' : 'stop'} requested (state ${room.state})`)
+      try {
+        await room.localParticipant.setScreenShareEnabled(enabled)
+        jarvisLog(`Screen share ${enabled ? 'published' : 'released'}; track state follows`)
+        return true
+      } catch (error) {
+        const failure = describeFailure(error, SESSION_ERROR_CODES.SCREEN_SHARE_FAILED)
+        jarvisError(`Screen share ${enabled ? 'start' : 'stop'} failed [${failure.code}]`, error)
+        jarvisWarn(failure.message)
         return false
       }
     },

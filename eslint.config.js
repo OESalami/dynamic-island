@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'release', 'node_modules']),
+  // Dev-only probe scripts in `scripts/` (e.g. the global-shortcut parser check)
+// are not part of the src tree and are not linted.
+globalIgnores(['dist', 'release', 'node_modules', 'scripts']),
 
   // Electron main process: Node globals, no browser globals.
   {

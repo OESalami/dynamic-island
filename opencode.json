@@ -1,0 +1,10 @@
+{
+  "mcp": {
+    "servers": {
+      "livekit-docs": {
+        "type": "remote",
+        "url": "https://docs.livekit.io/mcp"
+      }
+    }
+  }
+}

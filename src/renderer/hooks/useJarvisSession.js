@@ -28,7 +28,7 @@ import { bridge } from '../lib/bridge.js'
  * `jarvisSession` is a module-level singleton and the `Room` lives inside it, so
  * neither is owned by this component or by `App`. An unmount, a remount, a Fast
  * Refresh, an island show/hide or an island state change only ever detach and
- * re-attach these four listeners; the LiveKit connection is untouched and
+ * re-attach these five listeners; the LiveKit connection is untouched and
  * survives all of them.
  *
  * The consequence worth being explicit about: this is what makes the hook safe
@@ -65,6 +65,15 @@ export function useJarvisSession() {
       }
     })
 
+    // Screen share is the same pattern: main relays the user's keypress and the
+    // session service owns the track. Main only sends this while a session is
+    // live, so a share can never start without one.
+    const unsubscribeShare = bridge.onShareCommand((command) => {
+      if (command?.command === 'toggle') {
+        void jarvisSession.toggleScreenShare()
+      }
+    })
+
     bridge.notifyRendererReady()
 
     // The window is never focused, so `blur` is not the signal for teardown; the
@@ -78,6 +87,7 @@ export function useJarvisSession() {
       unsubscribePhase()
       unsubscribeLog()
       unsubscribeCommand()
+      unsubscribeShare()
       window.removeEventListener('pagehide', onPageHide)
     }
   }, [])

@@ -43,6 +43,8 @@ export const SESSION_EVENTS = Object.freeze({
   ACTIVE_SPEAKERS: 'activeSpeakers',
   /** The local microphone was published or unpublished. `{ enabled }` */
   MICROPHONE: 'microphone',
+  /** The local screen share was published or unpublished. `{ enabled }` */
+  SCREEN_SHARE: 'screenShare',
   /** Something failed. Payload: `{ code, message }`. */
   FAILURE: 'failure',
 })
@@ -61,6 +63,9 @@ export const SESSION_ERROR_CODES = Object.freeze({
   MICROPHONE_DENIED: 'microphone-denied',
   MICROPHONE_UNAVAILABLE: 'microphone-unavailable',
   MICROPHONE_FAILED: 'microphone-failed',
+  SCREEN_SHARE_DENIED: 'screen-share-denied',
+  SCREEN_SHARE_UNAVAILABLE: 'screen-share-unavailable',
+  SCREEN_SHARE_FAILED: 'screen-share-failed',
   AUDIO_SUBSCRIPTION_FAILED: 'audio-subscription-failed',
   AUDIO_PLAYBACK_BLOCKED: 'audio-playback-blocked',
   AGENT_LEFT: 'agent-left',
@@ -133,8 +138,10 @@ function isMissingDeviceError(error) {
  * happens to embed a token cannot reach a log line or the island.
  *
  * `fallbackCode` lets the caller keep the code meaningful for where the error
- * happened: a failure while publishing the microphone is `microphone-failed`, not
- * a generic `connect-failed`.
+ * happened: a failure while publishing the microphone is `microphone-failed`, and
+ * a failure while publishing the screen share is `screen-share-failed` (or, for
+ * a capture-level refusal, `screen-share-denied` / `screen-share-unavailable`) —
+ * never a generic `connect-failed` and never the microphone codes.
  */
 export function describeFailure(error, fallbackCode = SESSION_ERROR_CODES.UNKNOWN) {
   if (error instanceof TokenRequestError) {
@@ -144,12 +151,24 @@ export function describeFailure(error, fallbackCode = SESSION_ERROR_CODES.UNKNOW
     return { code: SESSION_ERROR_CODES.CONFIG_MISSING, message: error.message }
   }
   if (isPermissionError(error)) {
+    if (fallbackCode === SESSION_ERROR_CODES.SCREEN_SHARE_FAILED) {
+      return {
+        code: SESSION_ERROR_CODES.SCREEN_SHARE_DENIED,
+        message: 'Screen sharing was refused by the system.',
+      }
+    }
     return {
       code: SESSION_ERROR_CODES.MICROPHONE_DENIED,
       message: 'Microphone access was denied. Allow the microphone for this app and try again.',
     }
   }
   if (isMissingDeviceError(error)) {
+    if (fallbackCode === SESSION_ERROR_CODES.SCREEN_SHARE_FAILED) {
+      return {
+        code: SESSION_ERROR_CODES.SCREEN_SHARE_UNAVAILABLE,
+        message: 'No screen source was available to share.',
+      }
+    }
     return {
       code: SESSION_ERROR_CODES.MICROPHONE_UNAVAILABLE,
       message: 'No microphone was found.',
