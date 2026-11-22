@@ -32,6 +32,12 @@ export const IPC = {
   SESSION_STATUS: 'island:session-status',
   /** renderer -> main: a diagnostic log line, mirrored to the main console */
   LOG: 'island:log',
+  /**
+   * renderer -> main (invoke): one allowlisted desktop action requested by the
+   * cloud agent over LiveKit RPC. Main owns the tool registry and validates the
+   * session, the caller and the payload before doing anything.
+   */
+  DESKTOP_RPC: 'island:desktop-rpc',
   /** renderer -> main: all main -> renderer listeners have been registered */
   RENDERER_READY: 'island:renderer-ready',
 

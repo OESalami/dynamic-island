@@ -7,6 +7,8 @@
  * bridge. The fallback does nothing, so the island simply stays in its initial
  * state.
  */
+import { RPC_ERROR_CODES, serializeRpcError } from '../../shared/desktopRpc.js'
+
 const noop = () => {}
 const noopUnsubscribe = () => {}
 
@@ -25,6 +27,10 @@ const fallback = {
   notifyRendererReady: noop,
   sendSessionStatus: noop,
   writeLog: noop,
+  // A bare browser has no trusted main process. Return a structured failure so
+  // the RPC handler can report "session inactive" rather than crash the UI.
+  invokeDesktopRpc: async () =>
+    serializeRpcError(RPC_ERROR_CODES.SESSION_INACTIVE, 'Electron bridge is unavailable.'),
 }
 
 export const bridge = globalThis.window?.jarvisIsland ?? fallback

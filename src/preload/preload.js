@@ -105,6 +105,13 @@ const islandApi = {
     ipcRenderer.send(CH.SESSION_STATUS, { phase, ...(detail ?? {}) }),
 
   /**
+   * Forward one allowlisted desktop RPC request to the main process. The
+   * renderer receives only a string result; it cannot reach Node, `shell` or the
+   * filesystem from here.
+   */
+  invokeDesktopRpc: (request) => ipcRenderer.invoke(CH.DESKTOP_RPC, request),
+
+  /**
    * Mirror one diagnostic line to the main console. The island window is never
    * focused, so the renderer console cannot be opened by hand during normal use.
    */

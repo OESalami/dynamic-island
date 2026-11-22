@@ -2,7 +2,7 @@
 
 A system-level Dynamic Island overlay for a JARVIS desktop assistant. Windows-only, frameless, transparent, always-on-top.
 
-It owns the island window, the state machine and the animation, and it exposes a narrow IPC surface. It has two inputs: a voice session against a **deployed LiveKit agent** (see [LiveKit Integration](#livekit-integration)), and a future JARVIS process driving it by writing states into the controller — no renderer changes required either way. The agent, the model, and the LiveKit API credentials are not in this repository.
+It owns the island window, the state machine and the animation, and it exposes a narrow IPC surface. It has two inputs: a voice session against a **deployed LiveKit agent** (see [LiveKit Integration](#livekit-integration)), and a future JARVIS process driving it by writing states into the controller — no renderer changes required either way. The deployed agent and its model are not in this repository; a drop-in agent-side RPC client module is provided under `agent/`. LiveKit API credentials are never in this repository.
 
 ```
 hidden -> idle -> listening -> processing -> responding -> idle
@@ -127,6 +127,10 @@ Two guards keep this honest:
 - **Late reports are dropped.** Every session gets an id; a report carrying a stale id is refused, so a teardown that finishes after the user has already started a new session cannot move the new session's island. `error` is terminal for the session even though it is not terminal for the island, which is what makes restarting after a failure work.
 
 There is no agent-state API in the LiveKit client. The local participant's activity comes from `ActiveSpeakersChanged`; agent speech is detected from the subscribed remote audio track because server-side agents may not be included in active-speaker updates. The session cycles `listening ↔ thinking ↔ responding` for as long as the agent is connected and speaking.
+
+### Desktop RPC
+
+The cloud agent can request bounded desktop actions over LiveKit RPC on the **same room** — there is no second connection. The renderer validates the caller and the live session, then forwards one explicit IPC request to main, which owns the tool registry, the allowlists and the approval prompt. The contract and the drop-in Python agent module are documented in [docs/agent-desktop-rpc-spec.md](docs/agent-desktop-rpc-spec.md).
 
 ### LiveKit Integration
 
@@ -321,6 +325,7 @@ The window is set to `setIgnoreMouseEvents(true, { forward: true })`. `forward: 
 | `island:screen-share-command` | main → renderer | `toggle` + session id |
 | `island:session-status` | renderer → main | phase, session id, optional error code and message |
 | `island:log` | renderer → main | one `[JARVIS]` line, redacted |
+| `island:desktop-rpc` | renderer → main (invoke) | one allowlisted desktop action + session id, caller and payload |
 
 ## Configuration
 

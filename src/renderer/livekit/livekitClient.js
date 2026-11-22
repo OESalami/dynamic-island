@@ -1,5 +1,6 @@
 import { ConnectionState, LogLevel, Room, RoomEvent, Track, setLogLevel } from 'livekit-client'
 import { watchAgentAudioLevel } from './agentAudioLevel.js'
+import { registerDesktopRpc, unregisterDesktopRpc } from './desktopRpc.js'
 import { SESSION_ERROR_CODES, SESSION_EVENTS, describeFailure } from './livekitEvents.js'
 import { jarvisError, jarvisLog, jarvisWarn } from './livekitLogger.js'
 
@@ -96,7 +97,7 @@ function quietSdkLogger() {
   setLogLevel(LogLevel.warn)
 }
 
-export function createLiveKitClient({ onEvent }) {
+export function createLiveKitClient({ onEvent, desktopRpc }) {
   quietSdkLogger()
 
   /** @type {Room | null} */
@@ -488,6 +489,10 @@ export function createLiveKitClient({ onEvent }) {
       lastUserSpeaking = false
       wire(room)
 
+      // Register before connecting, so RPC is available as soon as the room is
+      // up. The handlers live on this Room and are removed by disconnect().
+      if (desktopRpc) registerDesktopRpc(room, desktopRpc)
+
       try {
         await room.connect(url, token)
         jarvisLog(`LiveKit connect() resolved. ${localSummary()}`)
@@ -510,6 +515,7 @@ export function createLiveKitClient({ onEvent }) {
 
       intentionalDisconnect = true
       jarvisLog(`LiveKit disconnect() requested. ${localSummary()}`)
+      unregisterDesktopRpc(room)
       stopAgentAudioLevelMonitor()
       lastAgentSpeaking = false
       // Detach first: a room that closes as a result of our own teardown must not

@@ -1,3 +1,4 @@
+import { bridge } from '../lib/bridge.js'
 import { SESSION_PHASES, isLivePhase } from '../../shared/sessionPhases.js'
 import { describeLiveKitConfig, readLiveKitConfig } from './livekitConfig.js'
 import { createLiveKitClient } from './livekitClient.js'
@@ -396,6 +397,16 @@ class JarvisSession {
 
       const client = createLiveKitClient({
         onEvent: (event, payload) => this.#handleEvent(attempt, event, payload),
+        // Desktop RPC rides on this same room; no second connection is made.
+        desktopRpc: {
+          invoke: (request) => bridge.invokeDesktopRpc(request),
+          getSessionId: () => attempt.sessionId,
+          isSessionLive: () =>
+            this.#attempt === attempt &&
+            !attempt.finishing &&
+            isLivePhase(this.#phase) &&
+            Boolean(attempt.client?.isConnected()),
+        },
       })
       attempt.client = client
       await client.connect(url, token)

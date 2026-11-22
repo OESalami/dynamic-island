@@ -36,7 +36,7 @@ const MAX_LOG_LENGTH = 500
  * Electron security guidance: any frame can in principle send IPC, including
  * iframes and devtools, so the sender is checked before doing anything.
  */
-function isTrustedSender(event) {
+export function isTrustedSender(event) {
   const window = getIslandWindow()
   if (!window || window.isDestroyed()) return false
   return event.sender === window.webContents

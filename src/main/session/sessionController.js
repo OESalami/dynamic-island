@@ -124,6 +124,16 @@ export function isLiveSession() {
 }
 
 /**
+ * The id of the current session, or null when there is none.
+ *
+ * Desktop RPC requests carry this id too, so a late request from a session the
+ * user already ended cannot drive the machine under a newer session.
+ */
+export function getActiveSessionId() {
+  return activeSessionId
+}
+
+/**
  * Toggle the screen share: what the share accelerator asks for.
  *
  * The main process only relays the user's keypress; the renderer owns the share

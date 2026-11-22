@@ -1,5 +1,6 @@
 import { app, screen } from 'electron'
 import { DEV_SERVER_URL, SHARE_ACCELERATOR } from '../shared/constants.js'
+import { registerDesktopRpcHandlers } from './desktopRpc/index.js'
 import { registerIpcHandlers } from './ipc/index.js'
 import { onDisplayChanged, requestState } from './island/islandController.js'
 import { installMediaPermissions } from './session/mediaPermissions.js'
@@ -40,6 +41,7 @@ function bootstrap() {
   app.whenReady().then(async () => {
     createIslandWindow()
     registerIpcHandlers()
+    registerDesktopRpcHandlers()
     installMediaPermissions()
     wireShortcuts()
 
